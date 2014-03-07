@@ -18,6 +18,9 @@ except ImportError:
         from django.utils import simplejson
         json = simplejson
 
+import tornado.gen
+from tornado.httpclient import AsyncHTTPClient
+
 __version__ = '0.6.5'
 
 class ZencoderError(Exception):
@@ -89,25 +92,33 @@ class HTTPBackend(object):
                                     **self.requests_params)
         return self.process(response)
 
-    def get(self, url, data=None):
+    @tornado.gen.engine
+    def get(self, url, data=None, callback=None):
         """ Executes an HTTP GET request for the given URL.
 
             ``data`` should be a dictionary of url parameters
         """
-        response = self.http.get(url,
-                                 headers=self.headers,
-                                 params=data,
-                                 **self.requests_params)
-        return self.process(response)
+        
+        url = url if (type(data) != dict or len(data) == 0) else "{0}?{1}".format(url, "&".join(map(lambda x:"{0}={1}".format(*x), data.iteritems())))
+        AsyncHTTPClient().fetch(
+            url,
+            method = "GET",
+            headers = self.headers,
+            callback = callback
+        )
+        # TODO self.request_params
 
-    def post(self, url, body=None):
+    @tornado.gen.engine
+    def post(self, url, body=None, callback=None):
         """ Executes an HTTP POST request for the given URL. """
-        response = self.http.post(url,
-                                  headers=self.headers,
-                                  data=body,
-                                  **self.requests_params)
-
-        return self.process(response)
+        AsyncHTTPClient().fetch(
+            url,
+            method = "POST",
+            headers = self.headers,
+            body = body,
+            callback = callback
+        )
+        # TODO self.request params
 
     def put(self, url, data=None, body=None):
         """ Executes an HTTP PUT request for the given URL. """
@@ -326,7 +337,8 @@ class Job(HTTPBackend):
         kwargs['resource_name'] = 'jobs'
         super(Job, self).__init__(*args, **kwargs)
 
-    def create(self, input=None, live_stream=False, outputs=None, options=None):
+    @tornado.gen.engine
+    def create(self, input=None, live_stream=False, outputs=None, options=None, callback=None):
         """ Creates a transcoding job. Here are some examples::
 
             job.create('s3://zencodertesting/test.mov')
@@ -347,7 +359,7 @@ class Job(HTTPBackend):
         if live_stream:
             data['live_stream'] = live_stream
 
-        return self.post(self.base_url, body=json.dumps(data))
+        return self.post(self.base_url, body=json.dumps(data), callback=callback)
 
     def list(self, page=1, per_page=50):
         """ Lists Jobs.
@@ -359,21 +371,23 @@ class Job(HTTPBackend):
                 "per_page": per_page}
         return self.get(self.base_url, data=data)
 
-    def details(self, job_id):
+    @tornado.gen.engine
+    def details(self, job_id, callback=None):
         """ Returns details of the given ``job_id``.
 
         https://app.zencoder.com/docs/api/jobs/show
 
         """
-        return self.get(self.base_url + '/%s' % str(job_id))
+        return self.get(self.base_url + '/%s' % str(job_id), callback=callback)
 
-    def progress(self, job_id):
+    @tornado.gen.engine
+    def progress(self, job_id, callback=None):
         """ Returns the progress of the given ``job_id``.
 
         https://app.zencoder.com/docs/api/jobs/progress
 
         """
-        return self.get(self.base_url + '/%s/progress' % str(job_id))
+        return self.get(self.base_url + '/%s/progress' % str(job_id), callback=callback)
 
     def resubmit(self, job_id):
         """ Resubmits the given ``job_id``.

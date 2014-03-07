@@ -3,7 +3,7 @@ try:
 except ImportError:
     from distutils.core import setup
 
-setup(name='zencoder',
+setup(name='tornadozencoder',
       version='0.6.5',
       description='Integration library for Zencoder',
       author='Alex Schworer',
@@ -12,7 +12,7 @@ setup(name='zencoder',
       license="MIT License",
       install_requires=['requests>=1.0'],
       tests_require=['mock', 'nose'],
-      packages=['zencoder'],
+      packages=['tornadozencoder'],
       platforms='any',
       classifiers=[
           'Development Status :: 4 - Beta',
